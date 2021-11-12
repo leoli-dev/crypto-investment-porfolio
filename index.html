@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Investment Porfolio</title>
+</head>
+
+<body>
+    <script>
+        // Constants
+        const PRICE_API_URL = 'https://api.nomics.com/v1/prices?key='
+        const LOCAL_STORAGE_KEY_PRICE_API_KEY = 'price_api_key'
+        const LOCAL_STORAGE_KEY_CRYPTO_PRICES = 'crypto_prices'
+        const LOCAL_STORAGE_KEY_PRICES_UPDATED_AT = 'crypto_prices_updated_at'
+        const API_DATA_TTL = 5 * 60000  // 5min
+        let priceApiKey = null;
+
+        // Set API Key
+        const setPriceApiKeyToLocalStorage = key => localStorage.setItem(LOCAL_STORAGE_KEY_PRICE_API_KEY, key)
+        const getPriceApiKeyFromLocalStorage = () => localStorage.getItem(LOCAL_STORAGE_KEY_PRICE_API_KEY)
+        const initialPriceApiKey = () => {
+            priceApiKey = getPriceApiKeyFromLocalStorage()
+            if (null !== priceApiKey) {
+                return
+            }
+            while (true) {
+                priceApiKey = prompt("Please enter API key")
+                if (null !== priceApiKey) {
+                    setPriceApiKeyToLocalStorage(priceApiKey)
+                    return
+                }
+            }
+        }
+
+        const setCryptoPricesToLocalStorage = cryptoPrices => {
+            localStorage.setItem(LOCAL_STORAGE_KEY_PRICES_UPDATED_AT, new Date())
+            localStorage.setItem(LOCAL_STORAGE_KEY_CRYPTO_PRICES, JSON.stringify(cryptoPrices))
+        }
+
+        const getCryptoPricesFromLocalStorage = () => {
+            const cryptoPrices = localStorage.getItem(LOCAL_STORAGE_KEY_CRYPTO_PRICES)
+
+            return cryptoPrices !== null ? JSON.parse(cryptoPrices) : null
+        }
+
+        const checkIfCryptoPricesOutdated = () => {
+            let updatedAt = localStorage.getItem(LOCAL_STORAGE_KEY_PRICES_UPDATED_AT)
+            if (null === updatedAt) {
+                return true
+            }
+            updatedAt = new Date(updatedAt)
+
+            return (new Date(updatedAt.getTime() + API_DATA_TTL)).getTime() <= (new Date()).getTime()
+        }
+
+        const fetchCryptoPricesRawData = async () => {
+            const response = await fetch(PRICE_API_URL + priceApiKey)
+            const data = response.json()
+
+            return data
+        }
+
+        const generateCryptoPricesFromRawData = rawData => {
+            const prices = {}
+            for (const raw of rawData) {
+                prices[raw.currency] = raw.price
+            }
+
+            return prices
+        }
+
+        const getCryptoPrices = async () => {
+            if (!checkIfCryptoPricesOutdated()) {
+                return getCryptoPricesFromLocalStorage()
+            }
+
+            const rawData = await fetchCryptoPricesRawData()
+            const prices = generateCryptoPricesFromRawData(rawData)
+            setCryptoPricesToLocalStorage(prices)
+
+            return prices
+        }
+
+
+        (async () => {
+            initialPriceApiKey()
+            const prices = await getCryptoPrices()
+
+            console.log(prices)
+        })()
+    </script>
+</body>
+
+</html>
