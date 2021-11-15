@@ -7,15 +7,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Investment Porfolio</title>
     <link rel="icon" type="image/png" href="./favicon.png" />
+    <style>
+        ul:before {
+            content: attr(aria-label);
+            font-size: 120%;
+            font-weight: bold;
+            margin-left: -15px;
+        }
+    </style>
 </head>
 
 <body>
+    <hr>
+    <h2>Add new account</h2>
+    <form action="/index.html" method="GET">
+        <div class="form-control">
+            <label for="name">Account Name: </label>
+            <input type="text" name="name" id="name">
+        </div>
+        <div class="form-control">
+            <label for="symbol">Crypto Currency: </label>
+            <select name="symbol" id="symbol">
+                <option value="" selected disabled>Choose the symbol</option>
+            </select>
+        </div>
+        <div class="form-control">
+            <label for="quantity">Quantity: </label>
+            <input type="number" name="quantity" id="quantity" step="0.00000001">
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+    <hr>
+    <h3>Total Value: $<span id="totalValue">0</span></h3>
+    <hr>
+    <div id="accountList"></div>
+    </div>
+
     <script>
+        /**** Backend Code ****/
+
         // Constants
         const PRICE_API_URL = 'https://api.nomics.com/v1/prices?key='
         const LOCAL_STORAGE_KEY_PRICE_API_KEY = 'price_api_key'
         const LOCAL_STORAGE_KEY_CRYPTO_PRICES = 'crypto_prices'
         const LOCAL_STORAGE_KEY_PRICES_UPDATED_AT = 'crypto_prices_updated_at'
+        const LOCAL_STORAGE_KEY_ACCOUNTS = 'accounts'
         const API_DATA_TTL = 5 * 60000  // 5min
         let priceApiKey = null;
 
@@ -82,15 +118,172 @@
             const prices = generateCryptoPricesFromRawData(rawData)
             setCryptoPricesToLocalStorage(prices)
 
-            return prices
+            return getCryptoPricesFromLocalStorage()
         }
 
+        const addAccountToLocalStorage = account => {
+            const accounts = getAccounsFromLocalStorage()
+            accounts.push(account)
+            localStorage.setItem(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts))
+        }
+
+        const getAccounsFromLocalStorage = () => {
+            const accounts = localStorage.getItem(LOCAL_STORAGE_KEY_ACCOUNTS)
+
+            return accounts !== null ? JSON.parse(accounts) : []
+        }
+
+        const processAccountData = (accounts, prices) => {
+            const data = {
+                totalValue: 0,
+                cryptoCurrencies: {},
+            }
+            for (const account of accounts) {
+                const symbol = account.symbol
+                const name = account.name
+                const quantity = account.quantity
+                const price = parseFloat(prices[symbol])
+                const value = calculateRoundTo3DecimalPoints(quantity * price)
+
+                if (!data.cryptoCurrencies.hasOwnProperty(symbol)) {
+                    data.cryptoCurrencies[symbol] = {
+                        totalQuantity: 0,
+                        totalValue: 0,
+                        accounts: [],
+                    }
+                }
+
+                data.cryptoCurrencies[symbol].totalQuantity += quantity
+                data.cryptoCurrencies[symbol].accounts.push({
+                    name,
+                    quantity,
+                    value,
+                })
+            }
+
+            for (const [symbol, datum] of Object.entries(data.cryptoCurrencies)) {
+                const price = parseFloat(prices[symbol])
+                datum.totalValue = calculateRoundTo3DecimalPoints(datum.totalQuantity * price)
+
+                data.totalValue += datum.totalValue
+            }
+
+            return data
+        }
+
+        const calculateRoundTo3DecimalPoints = value => {
+            return Math.floor(value * 1000) / 1000
+        }
+
+        /**** Frontend Code ****/
+        const fillSymbolSelectWithCyptoCurrencies = ($select, prices) => {
+            let optionsHtml = ''
+            for (let [symbol, datum] of Object.entries(prices)) {
+                symbol = symbol.toUpperCase()
+                optionsHtml += `<option value="${symbol}">${symbol}</option>`
+            }
+
+            $select.innerHTML += optionsHtml
+        }
+
+        const addAccountFormSubmitHandler = e => {
+            e.preventDefault()
+
+            const $nameInput = document.querySelector('#name')
+            const $symbolSelect = document.querySelector('#symbol')
+            const $quantityInput = document.querySelector('#quantity')
+
+            const name = $nameInput.value
+            const symbol = $symbolSelect.value
+            const quantity = parseFloat($quantityInput.value)
+
+            if (!validateFormValues(name, symbol, quantity)) {
+                return false
+            }
+
+            addAccountToLocalStorage({
+                name,
+                symbol,
+                quantity,
+            })
+
+            $nameInput.value = ''
+            $quantityInput.value = ''
+        }
+
+        const validateFormValues = (name, symbol, quantity) => {
+            if (!name.length) {
+                alert(`Account name can't be empty!`)
+
+                return false
+            }
+
+            if (!symbol.length) {
+                alert(`You must choose one of the crypto currencies!`)
+
+                return false
+            }
+
+            if (quantity <= 0) {
+                alert(`Quantity must bigger than 0!`)
+
+                return false
+            }
+
+            return true
+        }
+
+        const updateAccountList = accountData => {
+            const $accountListDiv = document.querySelector('#accountList')
+            let html = ''
+            for (let [symbol, data] of Object.entries(accountData.cryptoCurrencies)) {
+                html += `
+                <ul aria-label="${symbol}:">
+                    <li>Total Quantity: ${data.totalQuantity}</li>
+                    <li>Total Value: $${data.totalValue}</li>
+                    <li>Accounts:<ul>
+                `
+                for (let account of data.accounts) {
+                    html += `
+                        <li>
+                            ${account.name}
+                            <ul>
+                                <li>Quantity: ${account.quantity}</li>
+                                <li>Value: $${account.value}</li>
+                            </ul>
+                        </li>
+                    `
+                }
+                html += '</ul></li></ul>'
+            }
+            $accountListDiv.innerHTML = html
+        }
+
+        const updateTotalValue = accountData => {
+            const $spanTotalValue = document.querySelector('#totalValue')
+            $spanTotalValue.innerHTML = accountData.totalValue
+        }
 
         (async () => {
+            // Initial application
             initialPriceApiKey()
             const prices = await getCryptoPrices()
+            console.log({ prices })
 
-            console.log(prices)
+            const $form = document.querySelector('form')
+            const $symbolSelect = document.querySelector('#symbol')
+            fillSymbolSelectWithCyptoCurrencies($symbolSelect, prices)
+
+            const accounts = getAccounsFromLocalStorage()
+            const accountData = processAccountData(accounts, prices)
+            updateAccountList(accountData)
+            updateTotalValue(accountData)
+
+            $form.addEventListener('submit', addAccountFormSubmitHandler)
+
+            console.log({
+                accountData,
+            })
         })()
     </script>
 </body>
