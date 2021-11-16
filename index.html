@@ -103,7 +103,7 @@
         const generateCryptoPricesFromRawData = rawData => {
             const prices = {}
             for (const raw of rawData) {
-                prices[raw.currency] = raw.price
+                prices[raw.currency] = parseFloat(raw.price)
             }
 
             return prices
@@ -142,11 +142,13 @@
                 const symbol = account.symbol
                 const name = account.name
                 const quantity = account.quantity
-                const price = parseFloat(prices[symbol])
+                const price = prices[symbol]
                 const value = calculateRoundTo3DecimalPoints(quantity * price)
 
                 if (!data.cryptoCurrencies.hasOwnProperty(symbol)) {
                     data.cryptoCurrencies[symbol] = {
+                        percentage: 0,
+                        currentPrice: price,
                         totalQuantity: 0,
                         totalValue: 0,
                         accounts: [],
@@ -158,14 +160,24 @@
                     name,
                     quantity,
                     value,
+                    percentage: 0,
                 })
             }
 
             for (const [symbol, datum] of Object.entries(data.cryptoCurrencies)) {
-                const price = parseFloat(prices[symbol])
+                const price = prices[symbol]
                 datum.totalValue = calculateRoundTo3DecimalPoints(datum.totalQuantity * price)
-
                 data.totalValue += datum.totalValue
+
+                for (const account of datum.accounts) {
+                    account.percentage = account.value / datum.totalValue
+                }
+            }
+
+            data.totalValue = calculateRoundTo3DecimalPoints(data.totalValue)
+
+            for (const [symbol, datum] of Object.entries(data.cryptoCurrencies)) {
+                datum.percentage = datum.totalValue / data.totalValue
             }
 
             return data
@@ -176,17 +188,20 @@
         }
 
         /**** Frontend Code ****/
-        const fillSymbolSelectWithCyptoCurrencies = ($select, prices) => {
+        const fillSymbolSelectWithCyptoCurrencies = async () => {
+            const prices = await getCryptoPrices()
+            const $symbolSelect = document.querySelector('#symbol')
+
             let optionsHtml = ''
             for (let [symbol, datum] of Object.entries(prices)) {
                 symbol = symbol.toUpperCase()
                 optionsHtml += `<option value="${symbol}">${symbol}</option>`
             }
 
-            $select.innerHTML += optionsHtml
+            $symbolSelect.innerHTML += optionsHtml
         }
 
-        const addAccountFormSubmitHandler = e => {
+        const addAccountFormSubmitHandler = async e => {
             e.preventDefault()
 
             const $nameInput = document.querySelector('#name')
@@ -209,6 +224,8 @@
 
             $nameInput.value = ''
             $quantityInput.value = ''
+
+            await updateResultContent()
         }
 
         const validateFormValues = (name, symbol, quantity) => {
@@ -239,8 +256,10 @@
             for (let [symbol, data] of Object.entries(accountData.cryptoCurrencies)) {
                 html += `
                 <ul aria-label="${symbol}:">
+                    <li>Current Price: ${data.currentPrice}</li>
                     <li>Total Quantity: ${data.totalQuantity}</li>
                     <li>Total Value: $${data.totalValue}</li>
+                    <li>Percentage: ${calculateRoundTo3DecimalPoints(data.percentage * 100)}%</li>
                     <li>Accounts:<ul>
                 `
                 for (let account of data.accounts) {
@@ -250,6 +269,7 @@
                             <ul>
                                 <li>Quantity: ${account.quantity}</li>
                                 <li>Value: $${account.value}</li>
+                                <li>Percentage: ${calculateRoundTo3DecimalPoints(account.percentage * 100)}%</li>
                             </ul>
                         </li>
                     `
@@ -264,26 +284,24 @@
             $spanTotalValue.innerHTML = accountData.totalValue
         }
 
-        (async () => {
-            // Initial application
-            initialPriceApiKey()
+        const updateResultContent = async () => {
             const prices = await getCryptoPrices()
-            console.log({ prices })
-
-            const $form = document.querySelector('form')
-            const $symbolSelect = document.querySelector('#symbol')
-            fillSymbolSelectWithCyptoCurrencies($symbolSelect, prices)
-
             const accounts = getAccounsFromLocalStorage()
             const accountData = processAccountData(accounts, prices)
             updateAccountList(accountData)
             updateTotalValue(accountData)
+        }
 
+        (async () => {
+            // Initial application
+            initialPriceApiKey()
+
+
+            await fillSymbolSelectWithCyptoCurrencies()
+            await updateResultContent()
+
+            const $form = document.querySelector('form')
             $form.addEventListener('submit', addAccountFormSubmitHandler)
-
-            console.log({
-                accountData,
-            })
         })()
     </script>
 </body>
