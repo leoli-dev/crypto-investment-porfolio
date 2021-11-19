@@ -19,8 +19,8 @@
 
 <body>
     <hr>
-    <h2>Add new account</h2>
-    <form action="/index.html" method="GET">
+    <form id="addAccountForm" action="/index.html" method="GET">
+        <h2>Add a new account</h2>
         <div class="form-control">
             <label for="name">Account Name: </label>
             <input type="text" name="name" id="name">
@@ -41,6 +41,15 @@
     <h3>Total Value: $<span id="totalValue">0</span></h3>
     <hr>
     <div id="accountList"></div>
+    <hr>
+    <form id="importAccountsForm" action="/index.html" method="GET">
+        <h2>Update accounts data</h2>
+        <div class="form-control">
+            <label for="accounts">Account data: </label>
+            <textarea name="accounts" id="accounts" rows="4" cols="100"></textarea>
+        </div>
+        <button type="submit">Update</button>
+    </form>
     </div>
 
     <script>
@@ -124,6 +133,10 @@
         const addAccountToLocalStorage = account => {
             const accounts = getAccounsFromLocalStorage()
             accounts.push(account)
+            localStorage.setItem(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts))
+        }
+
+        const setAccountsToLocalStorage = accounts => {
             localStorage.setItem(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts))
         }
 
@@ -290,6 +303,29 @@
             const accountData = processAccountData(accounts, prices)
             updateAccountList(accountData)
             updateTotalValue(accountData)
+            updateAccountDataInTextarea(accounts)
+        }
+
+        const validAccountsData = raw => {
+            const data = JSON.parse(raw)
+            // TODO: to be continue   
+        }
+
+        const updateAccountDataInTextarea = accounts => {
+            const $accountsTextarea = document.querySelector('#accounts')
+            $accountsTextarea.value = JSON.stringify(accounts)
+        }
+
+        const importAccountsFormSubmitHandler = e => {
+            e.preventDefault()
+
+            const $accountsTextarea = document.querySelector('#accounts')
+            const accountData = $accountsTextarea.value
+
+            // TODO: should valid data before put it into local storage
+            setAccountsToLocalStorage(JSON.parse(accountData))
+
+            location.reload()
         }
 
         (async () => {
@@ -300,8 +336,12 @@
             await fillSymbolSelectWithCyptoCurrencies()
             await updateResultContent()
 
-            const $form = document.querySelector('form')
-            $form.addEventListener('submit', addAccountFormSubmitHandler)
+            const $addAccountForm = document.querySelector('#addAccountForm')
+            $addAccountForm.addEventListener('submit', addAccountFormSubmitHandler)
+
+            const $importAccountsForm = document.querySelector('#importAccountsForm')
+            $importAccountsForm.addEventListener('submit', importAccountsFormSubmitHandler)
+
         })()
     </script>
 </body>
