@@ -155,7 +155,7 @@
                 const symbol = account.symbol
                 const name = account.name
                 const quantity = account.quantity
-                const price = prices[symbol]
+                const price = prices.hasOwnProperty(symbol) ? prices[symbol] : 0
                 const value = calculateRoundTo3DecimalPoints(quantity * price)
 
                 if (!data.cryptoCurrencies.hasOwnProperty(symbol)) {
@@ -178,12 +178,12 @@
             }
 
             for (const [symbol, datum] of Object.entries(data.cryptoCurrencies)) {
-                const price = prices[symbol]
+                const price = prices.hasOwnProperty(symbol) ? prices[symbol] : 0
                 datum.totalValue = calculateRoundTo3DecimalPoints(datum.totalQuantity * price)
                 data.totalValue += datum.totalValue
 
                 for (const account of datum.accounts) {
-                    account.percentage = account.value / datum.totalValue
+                    account.percentage = datum.totalValue !== 0 ? (account.value / datum.totalValue) : 0
                 }
             }
 
