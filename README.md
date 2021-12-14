@@ -4,8 +4,9 @@ A SPA helps you to track your crypto currency investment porfolio.
 
 ## How to start the application
 
-1. Clone this project locally and run the `index.html` on your browser
-2. Clone this project locally and use the live server feature of VScode to host the `index.html` as an local server
+1. Please make sure you have docker installed on your machine
+2. Clone this project locally
+3. Run `make start` on the root directoy of the project
 
 ## How to get API key
 
